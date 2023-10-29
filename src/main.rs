@@ -2,6 +2,8 @@ use std::collections::HashMap;
 use std::io::prelude::*;
 use std::net::{SocketAddr, TcpListener, TcpStream, IpAddr, Ipv4Addr};
 
+use nom::AsBytes;
+
 const CRLF: &str = "\r\n";
 
 enum HTTPMethod {
@@ -47,8 +49,11 @@ fn write_response_code(mut stream: TcpStream, status: &str) -> std::io::Result<u
 }
 
 fn handle_stream(mut stream: TcpStream) -> std::io::Result<usize> {
-    let mut request_str = String::new(); 
-    stream.read_to_string(&mut request_str)?;
+    // let mut request_str = String::new(); 
+    // stream.read_to_string(&mut request_str)?;
+    let mut buffer = Vec::new();
+    stream.read_to_end(&mut buffer)?;
+    let request_str = String::from_utf8_lossy(buffer.as_bytes()).to_string();
     let request = parse_request_str(request_str).unwrap();
     match request.path.as_str() {
         "/" => write_response_code(stream, "200 OK"),
