@@ -2,8 +2,6 @@ use std::collections::HashMap;
 use std::io::prelude::*;
 use std::net::{SocketAddr, TcpListener, TcpStream, IpAddr, Ipv4Addr};
 
-use nom::AsBytes;
-
 const CRLF: &str = "\r\n";
 
 enum HTTPMethod {
@@ -26,12 +24,14 @@ fn parse_request_str(raw: String) -> Result<HTTPRequest, ()> {
     assert!(start_line.len() == 3);
 
     let mut headers = HashMap::new();
-    if start_line.len() > 2 {
-        for line in start_line[2..].into_iter() {
+    if lines.len() > 2 {
+        for line in lines[2..].into_iter() {
+            if line.len() == 0 { continue; }
             let header = line.split(": ")
                 .collect::<Vec<&str>>();
-            assert!(header.len() == 2);
-            headers.insert(header[0].to_string(), header[1].to_string());
+            if header.len() == 2 {
+                headers.insert(header[0].to_string(), header[1].to_string());
+            }
         }
     }
     let request = HTTPRequest {
@@ -49,11 +49,9 @@ fn write_response_code(mut stream: TcpStream, status: &str) -> std::io::Result<u
 }
 
 fn handle_stream(mut stream: TcpStream) -> std::io::Result<usize> {
-    // let mut request_str = String::new(); 
-    // stream.read_to_string(&mut request_str)?;
-    let mut buffer = Vec::new();
-    stream.read_to_end(&mut buffer)?;
-    let request_str = String::from_utf8_lossy(buffer.as_bytes()).to_string();
+    let mut buffer = [0; 1024];
+    stream.read(&mut buffer)?;
+    let request_str = String::from_utf8_lossy(&buffer).to_string();
     let request = parse_request_str(request_str).unwrap();
     match request.path.as_str() {
         "/" => write_response_code(stream, "200 OK"),
