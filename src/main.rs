@@ -109,6 +109,15 @@ fn handle_request(request: HTTPRequest) -> HTTPResponse {
                 }) 
             }
         },
+        path if path.starts_with("/user-agent") => {
+            HTTPResponse { 
+                status_code: HTTPResponseStatusCode::Ok, 
+                payload: Some(HTTPResponsePayload {
+                    content_type: HTTPContentType::PlainText,
+                    payload: request.headers.get("User-Agent").unwrap().to_owned(),
+                }) 
+            }
+        },
         "/" => HTTPResponse { status_code: HTTPResponseStatusCode::Ok, payload: None },
         _ => HTTPResponse { status_code: HTTPResponseStatusCode::NotFound, payload: None },
     }
@@ -120,7 +129,6 @@ fn handle_stream(mut stream: TcpStream) -> std::io::Result<usize> {
     let request_str = String::from_utf8_lossy(&buffer).to_string();
     let request = parse_request_str(request_str).unwrap();
     let response = handle_request(request);
-    println!("{}", response.to_string());
     stream.write(response.to_string().as_bytes())
 }
 
