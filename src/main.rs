@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::io::prelude::*;
+use std::thread;
 use std::net::{SocketAddr, TcpListener, TcpStream, IpAddr, Ipv4Addr};
 
 const CRLF: &str = "\r\n";
@@ -136,7 +137,12 @@ fn main() -> std::io::Result<()> {
     let localhost = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 4221);
     let listener = TcpListener::bind(localhost)?;
     for stream in listener.incoming() {
-        _ = handle_stream(stream?);
+        match stream {
+            Ok(stream_) => _ = thread::spawn(|| {
+                _ = handle_stream(stream_);
+            }),
+            Err(e) => println!("{}", e)   
+        }
     }
     Ok(())
 }
