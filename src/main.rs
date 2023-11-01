@@ -1,5 +1,8 @@
 use std::collections::HashMap;
+use std::env;
+use std::fs;
 use std::io::prelude::*;
+use std::path::Path;
 use std::thread;
 use std::net::{SocketAddr, TcpListener, TcpStream, IpAddr, Ipv4Addr};
 
@@ -59,13 +62,15 @@ impl ToString for HTTPResponseStatusCode {
 }
 
 enum HTTPContentType {
-    PlainText
+    PlainText,
+    ApplicationOctetStream,
 }
 
 impl ToString for HTTPContentType {
     fn to_string(&self) -> String {
         match &self {
             HTTPContentType::PlainText => "Content-Type: text/plain".to_owned(),
+            HTTPContentType::ApplicationOctetStream => "Content-Type: application/octet-stream".to_owned(),
         }
     }
 }
@@ -97,7 +102,7 @@ impl ToString for HTTPResponse {
     }
 }
 
-fn handle_request(request: HTTPRequest) -> HTTPResponse {
+fn handle_request(request: HTTPRequest, context: Option<ServerContext>) -> HTTPResponse {
     match request.path.as_str() {
         path if path.starts_with("/echo") => {
             let components = path.split('/')
@@ -119,27 +124,61 @@ fn handle_request(request: HTTPRequest) -> HTTPResponse {
                 }) 
             }
         },
+        path if path.starts_with("/files") => {
+            let components = path.split('/')
+                .collect::<Vec<&str>>();
+            let filename = components[2].to_owned();
+            let filepath = format!("{}{}", context.unwrap().directory, filename);
+            if Path::new(filepath.as_str()).exists() { 
+                HTTPResponse { 
+                    status_code: HTTPResponseStatusCode::Ok, 
+                    payload: Some(HTTPResponsePayload {
+                        content_type: HTTPContentType::ApplicationOctetStream,
+                        payload: fs::read_to_string(filepath).unwrap().parse().unwrap(),
+                    }) 
+                }
+            } else {
+                HTTPResponse { status_code: HTTPResponseStatusCode::NotFound, payload: None }
+            }
+        },
         "/" => HTTPResponse { status_code: HTTPResponseStatusCode::Ok, payload: None },
         _ => HTTPResponse { status_code: HTTPResponseStatusCode::NotFound, payload: None },
     }
 }
 
-fn handle_stream(mut stream: TcpStream) -> std::io::Result<usize> {
+fn handle_stream(mut stream: TcpStream, context: Option<ServerContext>) -> std::io::Result<usize> {
     let mut buffer = [0; 1024];
     stream.read(&mut buffer)?;
     let request_str = String::from_utf8_lossy(&buffer).to_string();
     let request = parse_request_str(request_str).unwrap();
-    let response = handle_request(request);
+    let response = handle_request(request, context);
     stream.write(response.to_string().as_bytes())
 }
 
+#[derive(Copy, Clone)]
+struct ServerContext {
+    directory: &'static str,
+}
+
 fn main() -> std::io::Result<()> {
+    let args: Vec<String> = env::args().collect();
+
     let localhost = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 4221);
     let listener = TcpListener::bind(localhost)?;
+    let context: Option<ServerContext>;
+    if args.len() > 1 && args[1] == "--directory" {
+        let directory: &'static str = Box::leak(args[2].clone().into_boxed_str());
+        context = Some(ServerContext {
+            directory: directory
+        });
+    } else {
+        context = None;
+    }
+
     for stream in listener.incoming() {
         match stream {
-            Ok(stream_) => _ = thread::spawn(|| {
-                _ = handle_stream(stream_);
+            Ok(stream_) => _ = thread::spawn(move || {
+                _ = handle_stream(stream_, context);
             }),
             Err(e) => println!("{}", e)   
         }
