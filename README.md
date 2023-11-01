@@ -1,4 +1,6 @@
-(Very) bad take on http server. 
+## @yabalaban: my (very) bad take on http server; below goes the advertisement of the codecrafters, check them out! 
+
+----------
 
 [![progress-banner](https://backend.codecrafters.io/progress/http-server/63bd3e21-9e9c-425e-baa3-19dd972e19eb)](https://app.codecrafters.io/users/yabalaban?r=2qF)
 
